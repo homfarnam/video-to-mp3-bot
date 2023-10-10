@@ -6,3 +6,10 @@ node_modules
 /keys
 
 gram.ts
+
+ffmpeg
+*.tgs
+
+*.mp4
+
+*.zip

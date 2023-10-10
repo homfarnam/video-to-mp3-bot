@@ -1,5 +1,6 @@
-const { TelegramClient, Api } = require("telegram");
-const { StringSession } = require("telegram/sessions");
+import { Api, TelegramClient } from "telegram";
+import { NewMessageEvent } from "telegram/events";
+import { StringSession } from "telegram/sessions";
 const path = require("path");
 const fs = require("fs");
 var ffmpeg = require("fluent-ffmpeg");
@@ -51,19 +52,15 @@ const updateUser = async (chatId, newValues) => {
       connectionRetries: 5,
     }
   );
-  await client.start();
+  await client.start({
+    botAuthToken: keys.BOT_TOKEN,
+  });
 
   // create function for get all data from database
 
-  let dbData = [];
+  const dbData = await allData.find({}).toArray();
 
-  const refreshDBData = async () => {
-    dbData = await allData.find({}).toArray();
-  };
-
-  setInterval(refreshDBData, 60000); // every 60 seconds
-
-  client.addEventHandler(async (update) => {
+  client.addEventHandler(async (update: NewMessageEvent) => {
     const chatID = Number(update.message.chatId);
 
     console.log("data: ", await allData.countDocuments());
@@ -76,13 +73,14 @@ const updateUser = async (chatId, newValues) => {
       new Api.users.GetFullUser({
         id: new Api.InputUser({
           userId: update.message.peerId.userId,
+          accessHash: update.message.peerId.accessHash,
         }),
       })
     );
 
     await client.invoke(
       new Api.bots.SetBotCommands({
-        scope: new Api.BotCommandScopeUsers(),
+        scope: new Api.BotCommandScopeDefault(),
         langCode: "en",
         commands: [
           new Api.BotCommand({
@@ -101,13 +99,7 @@ const updateUser = async (chatId, newValues) => {
     // set commands just for admin
     await client.invoke(
       new Api.bots.SetBotCommands({
-        scope: new Api.BotCommandScopePeer({
-          userId: 2829192,
-          peer: new Api.InputPeerUser({
-            userId: 2829192,
-            accessHash: 4968938587861045898,
-          }),
-        }),
+        scope: new Api.BotCommandScopeChats(adminChatId),
         langCode: "en",
         commands: [
           new Api.BotCommand({
@@ -135,33 +127,11 @@ const updateUser = async (chatId, newValues) => {
       update.message.message.startsWith("/sendmessage") &&
       update.message.peerId.userId === adminId
     ) {
-      const messageParts = update.message.message.split(" ");
-      const message = messageParts.slice(1).join(" ");
-      const image = update.message.media; // assuming the image is sent as media in the message
-
-      // Ask for confirmation before sending the message
-      const confirmation = await client.sendMessage(adminId, {
-        message: "Are you sure you want to send this message to all users?",
-        buttons: [
-          { text: "Yes", callback_data: "confirm" },
-          { text: "No", callback_data: "cancel" },
-        ],
-      });
-
-      // Listen for the confirmation response
-      client.on("callback_query", (query) => {
-        if (query.data === "confirm") {
-          // dbData.forEach((user) => {
-          // });
-          client.sendMessage(adminChatId, {
-            message: message,
-            media: image, // send the image along with the message
-          });
-        } else if (query.data === "cancel") {
-          client.sendMessage(adminId, {
-            message: "Message sending cancelled",
-          });
-        }
+      const message = update.message.message.split(" ").slice(1).join(" ");
+      dbData.forEach((user) => {
+        client.sendMessage(user.chatId, {
+          message: message,
+        });
       });
     }
 
@@ -196,21 +166,17 @@ const updateUser = async (chatId, newValues) => {
       );
 
       if (!isUserExist) {
-        await createUser(newUser);
         client.sendMessage(keys.channelUser, {
           message: `New user joined the bot: @${userData.users[0].username}`,
         });
+        createUser(newUser);
 
-        await client.sendMessage(keys.channelUser, {
-          message: `All users: ${await allData.countDocuments()}`,
+        client.sendMessage(keys.channelUser, {
+          message: `All users: ${dbData.length}`,
         });
 
         client.sendMessage(2829192, {
-          message: `New user joined the bot: @${userData.users[0].username} , name: ${userData.users[0].firstName} ${userData.users[0].lastName}`,
-        });
-
-        await client.sendMessage(2829192, {
-          message: `All users: ${await allData.countDocuments()}`,
+          message: `New user joined the bot: ${userData.users[0].username}`,
         });
       }
 
@@ -219,20 +185,18 @@ const updateUser = async (chatId, newValues) => {
       if (isUserExist) {
         const options = { upsert: true };
 
-        const userId = Number(userData.users[0].id);
-
         const newData = {
           firstname: userData.users[0].firstName,
           lastName: userData.users[0].lastName,
-          accessHash: userData.users[0].accessHash.toString(),
-          userId: userId,
         };
-
-        console.log("user data: ", newData);
 
         updateUser(chatID, newData, options);
         console.log("update user ...done");
       }
+
+      client.sendMessage(2829192, {
+        message: `New user joined the bot: ${userData.users[0].username}`,
+      });
 
       // const markup = client.buildReplyMarkup(Button.inline("Hello!"));
 
@@ -377,8 +341,6 @@ const updateUser = async (chatId, newValues) => {
             const newData = {
               botUsage: isUserExist.botUsage + 1,
             };
-
-            console.log({ newData });
 
             updateUser(chatID, newData, options);
             console.log("update user ...done");
