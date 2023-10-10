@@ -1,22 +1,25 @@
-const { Telegraf } = require('telegraf');
-require('dotenv').config();
-const bot = new Telegraf('5716003495:AAGtU52nwVtNU4iDASSl2qkokyTSIupFivo');
-const path = require('path');
-const request = require('request');
-const fetch = require('node-fetch');
-const fs = require('fs');
-const PdfExtractor = require('pdf-extractor').PdfExtractor;
-const CanvasRenderer = require('pdf-extractor').CanvasRenderer;
-const SvgRenderer = require('pdf-extractor').SvgRenderer;
-const FileWriter = require('pdf-extractor').FileWriter;
+const { Telegraf } = require("telegraf");
+require("dotenv").config();
+const bot = new Telegraf("");
+const path = require("path");
+const request = require("request");
+const fetch = require("node-fetch");
+const fs = require("fs");
+const PdfExtractor = require("pdf-extractor").PdfExtractor;
+const CanvasRenderer = require("pdf-extractor").CanvasRenderer;
+const SvgRenderer = require("pdf-extractor").SvgRenderer;
+const FileWriter = require("pdf-extractor").FileWriter;
 
 class JPGWriter extends FileWriter {
   getFilePathForPage(page) {
-    return super.getPagePath(page.pageNumber, 'png');
+    return super.getPagePath(page.pageNumber, "png");
   }
 
   writeCanvasPage(page, viewport, canvas) {
-    return this.writeStreamToFile(canvas.jpgStream(), this.getFilePathForPage(page));
+    return this.writeStreamToFile(
+      canvas.jpgStream(),
+      this.getFilePathForPage(page)
+    );
   }
 }
 
@@ -50,12 +53,12 @@ const pdfExtractor = (url) =>
 
 let pageLength = 0;
 
-bot.help((ctx) => ctx.reply('Send me a sticker'));
+bot.help((ctx) => ctx.reply("Send me a sticker"));
 
 // this is used to download the file from the link
 const download = (url, path, callback) => {
   request.head(url, (err, res, body) => {
-    request(url).pipe(fs.createWriteStream(path)).on('close', callback);
+    request(url).pipe(fs.createWriteStream(path)).on("close", callback);
   });
 };
 
@@ -63,15 +66,18 @@ const sleep = (time) => {
   return new Promise((resolve) => setTimeout(resolve, time));
 };
 
-bot.on('text', (ctx, next) => {
-  console.log('here');
+bot.on("text", (ctx, next) => {
+  console.log("here");
 
-  ctx.telegram.sendMessage(ctx.message.chat.id, 'User id: ' + ctx.message.chat.id);
+  ctx.telegram.sendMessage(
+    ctx.message.chat.id,
+    "User id: " + ctx.message.chat.id
+  );
 });
 
 // get file content data from telegram
-bot.on('document', async (ctx) => {
-  console.log('here');
+bot.on("document", async (ctx) => {
+  console.log("here");
 
   const fileId = ctx.message.document.file_id;
 
@@ -93,19 +99,21 @@ bot.on('document', async (ctx) => {
   const chatFolderID = `./images/${ctx.message.chat.id}`;
 
   if (!fs.existsSync(chatFolderID)) {
-    console.log('dont exist', ctx.message.chat.id);
+    console.log("dont exist", ctx.message.chat.id);
     console.log(`./images/${ctx.message.chat.id}`);
     // fs.mkdirSync(`./images/${ctx.message.chat.id}`);
-    fs.mkdir(path.join('./images/', `${ctx.message.chat.id}`), (err) => {
+    fs.mkdir(path.join("./images/", `${ctx.message.chat.id}`), (err) => {
       if (err) {
-        return console.error('error create folder: ', err);
+        return console.error("error create folder: ", err);
       }
-      console.log('Directory created successfully!');
+      console.log("Directory created successfully!");
     });
     console.log(`./images/${ctx.message.chat.id}`);
   }
 
-  await download(downloadURL, path.join(chatFolderID, `${fileName}`), () => console.log('Done!'));
+  await download(downloadURL, path.join(chatFolderID, `${fileName}`), () =>
+    console.log("Done!")
+  );
 
   try {
     await pdfExtractor(`./images/${ctx.message.chat.id}`)
@@ -113,10 +121,10 @@ bot.on('document', async (ctx) => {
       .then((res) => {
         pageLength = res.jsonData.numpages;
 
-        console.log('# End of Document - done');
+        console.log("# End of Document - done");
       })
       .catch(function (err) {
-        console.error('Error: ' + err);
+        console.error("Error: " + err);
       });
   } catch (error) {
     console.log(error);
@@ -127,7 +135,9 @@ bot.on('document', async (ctx) => {
   // // sendAllPhotos(ctx, chatFolderID);
 
   // // get all the png images from the folder
-  const files = fs.readdirSync(chatFolderID).filter((file) => file.endsWith('.png'));
+  const files = fs
+    .readdirSync(chatFolderID)
+    .filter((file) => file.endsWith(".png"));
 
   console.log({ files });
   let fileCount = 1;
@@ -166,7 +176,7 @@ bot.on('document', async (ctx) => {
   // deleteFolderRecursive(chatFolderID);
 
   do {
-    console.log('image: ', `${chatFolderID}/page-${fileCount}.png`);
+    console.log("image: ", `${chatFolderID}/page-${fileCount}.png`);
 
     // open image with fs
     const image = fs.readFileSync(`${chatFolderID}/page-${fileCount}.png`);
@@ -183,7 +193,7 @@ bot.on('document', async (ctx) => {
 const deleteFolderRecursive = (path) => {
   if (fs.existsSync(path)) {
     fs.readdirSync(path).forEach((file, index) => {
-      const curPath = path + '/' + file;
+      const curPath = path + "/" + file;
       if (fs.lstatSync(curPath).isDirectory()) {
         // recurse
         deleteFolderRecursive(curPath);
